@@ -1,0 +1,180 @@
+from machine import Pin,PWM,SoftI2C
+import time
+import ssd1306
+
+#oled Screen setup：
+# Create an i2c object
+i2c = SoftI2C(scl=Pin(22), sda=Pin(21))  #时钟引脚22，数据引脚21
+# Width height (resolution dependent)
+oled_width = 128
+oled_height = 64
+# Create oled screen objects
+oled = ssd1306.SSD1306_I2C(oled_width, oled_height, i2c) #导入数据时，严格按照顺序，宽度高度
+
+#Pin setting:
+pin27 = Pin(27,Pin.OUT)
+pin26 = Pin(26,Pin.OUT)
+pin12 = Pin(12,Pin.OUT)
+pin14 = Pin(14,Pin.OUT)
+pin19 = Pin(19,Pin.OUT)
+pin18 = Pin(18,Pin.OUT)
+pin5 = Pin(5,Pin.OUT)
+pin17 = Pin(17,Pin.OUT)
+xj1 = Pin(25,Pin.IN)
+xj2 = Pin(16,Pin.IN)
+xj3 = Pin(4,Pin.IN)
+count_x = 0
+count_y = 0
+
+
+def set_up() :
+    global motor1
+    global motor2
+    global motor3
+    global motor4
+    global motor5
+    global motor6
+    global motor7
+    global motor8
+    motor3 = PWM(Pin(27),freq=20000,duty=0)  
+    motor4 = PWM(Pin(26),freq=20000,duty=0)
+    motor1 = PWM(Pin(12),freq=20000,duty=0)
+    motor2 = PWM(Pin(14),freq=20000,duty=0)
+    motor5 = PWM(Pin(19),freq=20000,duty=0)
+    motor6 = PWM(Pin(18),freq=20000,duty=0)
+    motor7 = PWM(Pin(5),freq=20000,duty=0)
+    motor8 = PWM(Pin(17),freq=20000,duty=0)
+
+
+def move_up ():
+    motor1.duty(0)
+    motor2.duty(950)
+    motor3.duty(0)
+    motor4.duty(950)
+    motor5.duty(0)
+    motor6.duty(950)
+    motor7.duty(950)
+    motor8.duty(0)
+    
+#Back:
+def move_down ():
+    motor1.duty(950)
+    motor2.duty(0)
+    motor3.duty(950)
+    motor4.duty(0)
+    motor5.duty(950)
+    motor6.duty(0)
+    motor7.duty(0)
+    motor8.duty(950)
+  
+    
+#Left pan:
+def move_left():
+    motor1.duty(950)
+    motor2.duty(0)
+    motor3.duty(0)
+    motor4.duty(950)
+    motor5.duty(0)
+    motor6.duty(950)
+    motor7.duty(0)
+    motor8.duty(950)
+    
+    
+#Right pan: 
+def move_right():
+    motor1.duty(0)
+    motor2.duty(950)
+    motor3.duty(950)
+    motor4.duty(0)
+    motor5.duty(950)
+    motor6.duty(0)
+    motor7.duty(950)
+    motor8.duty(0)
+
+    
+#Stop:
+def move_stop ():
+    motor1.duty(0)
+    motor2.duty(0)
+    motor3.duty(0)
+    motor4.duty(0)
+    motor5.duty(0)
+    motor6.duty(0)
+    motor7.duty(0)
+    motor8.duty(0)
+    
+def move_y_fun(xj1) :
+    global  count_y
+    while xj3.value() == 1 :
+          count_y = count_y + 1
+          print('count_y:%d' %(count_y))
+          oled.fill(0)
+          oled.text('count_y:'+str(count_y),0,20)
+          oled.show()
+          time.sleep(1.5)
+          if count_y <3:
+                 print('go on move_left')
+                 time.sleep(0.5)
+                 move_left()
+          elif count_y ==3:
+                 print('stop')
+                 move_stop()
+                 time.sleep(2)
+                 print('move_right')
+                 move_right()
+                 while xj3.value() == 0 and xj2.value() == 1:
+                       move_stop()
+                       time.sleep(3)
+                       print('move_down')
+                       move_down()
+                 while xj2.value() == 0 :
+                       print('move_stop')
+                       move_stop()
+                       time.sleep(10)
+                       print('over')
+
+
+oled.fill(0)
+oled.text('gry.car',0,0)
+oled.show()         
+          
+while True :
+    set_up()
+    while xj1.value() == 1 and xj2.value() == 0 :
+          move_up()
+          print('move_up')
+          time.sleep(0.2)
+    while xj1.value() == 1 and xj2.value() == 1   :
+        move_stop()
+        time.sleep(1)
+        count_x = count_x + 1
+        print('count_x:%d' %(count_x))
+        oled.fill(0)
+        oled.text('count_x:'+ str(count_x),0,10)
+        oled.show()
+        time.sleep(1)
+        if count_x == 4 :
+            move_stop()
+            time.sleep(1)
+            print('start turn left')
+            move_left()
+        elif count_x <= 4:
+            print('move_up')
+            move_up()
+        break
+    
+    #move_left()
+    #time.sleep(0.01)
+    #print('adjust')
+    while count_x >=4 :
+        move_left()
+        time.sleep(0.5)
+        if  xj1.value() == 0 :
+            print('start irq')
+            time.sleep(1)
+            move_stop()
+            print('middle stop')
+            time.sleep(1.5)
+            xj1.irq(move_y_fun,Pin.IRQ_FALLING)
+        
+        
