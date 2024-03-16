@@ -1,0 +1,243 @@
+from machine import Pin,PWM
+from machine import Timer
+from time import sleep_ms
+import bluetooth
+import time
+ 
+BLE_MSG = ""  # Define an empty variable
+global x
+global y
+# Define motor logic control pin, PWM output pin; Left front A right front B right back C left back D
+pwmA = PWM(Pin(23),freq=15000)  # Note parameter Settings: (pin definition, frequency setting, duty cycle initialization setting)
+A1 = Pin(1,Pin.OUT)
+A2 = Pin(3,Pin.OUT)
+pwmB = PWM(Pin(5),freq=15000)
+B1 = Pin(19,Pin.OUT)
+B2 = Pin(18,Pin.OUT)
+pwmC = PWM(Pin(15),freq=15000)
+C1 = Pin(2,Pin.OUT)
+C2 = Pin(0,Pin.OUT)
+pwmD = PWM(Pin(17),freq=15000)
+D1 = Pin(16,Pin.OUT)
+D2 = Pin(4,Pin.OUT)
+# Buzzer definition:
+pin9 = Pin(9,Pin.OUT)
+ 
+class ESP32_BLE():
+    def __init__(self, name):
+        self.led = Pin(2, Pin.OUT)  # Create an LED object. This LED is an onboard blue LED that uses GPIO port 2
+        self.timer1 = Timer(0)  The ESP32 has 4 hardware timers, 0 is used here
+        self.name = name  # Passed in parameter name
+        self.ble = bluetooth.BLE() # Create a BLE object
+        self.ble.active(True)  # Start Bluetooth
+        self.ble.config(gap_name=name) # Configure Bluetooth, give Bluetooth a name
+        self.disconnected() # Call function execution timer
+        self.ble.irq(self.ble_irq)  # Bluetooth call interrupt function. When the phone sends data to the ESP32, the ESP32 Bluetooth automatically executes this interrupt after receiving the data
+        self.register() # Register
+        self.advertiser() # Broadcast
+ 
+    def connected(self):
+        self.led.value(1)   #A value of 1 indicates that the blue LED is bright
+        self.timer1.deinit()  # A value of 1 indicates that the blue LED is bright
+ 
+    def disconnected(self):
+        # A value of 1 indicates that the blue LED is bright
+        self.timer1.init(period=100, mode=Timer.PERIODIC, callback=lambda t: self.led.value(not self.led.value()))
+ 
+    def ble_irq(self, event, data):
+        global BLE_MSG
+        if event == 1: #_IRQ_CENTRAL_CONNECT  #Your phone is connected to this device
+            self.connected()  # Call the function to achieve the effect of flashing when the Bluetooth is not connected and growing bright after connecting
+        elif event == 2: #_IRQ_CENTRAL_DISCONNECT 手机已断开此设备
+            self.advertiser()  # Call the function to make Bluetooth broadcast
+            self.disconnected()  # When the Bluetooth is disconnected, the blue LED flashes again
+        elif event == 3: #_IRQ_GATTS_WRITE The phone sends data to this device
+            buffer = self.ble.gatts_read(self.rx)  # Receive data from your phone
+            BLE_MSG = buffer.decode('UTF-8').strip()  # utf-8 is installed to decode the received data, so the phone should be encoded in utf-8 when sending data
+            
+    def register(self):        
+        service_uuid = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E'
+        reader_uuid = '6E400002-B5A3-F393-E0A9-E50E24DCCA9E'
+        sender_uuid = '6E400003-B5A3-F393-E0A9-E50E24DCCA9E'
+        
+        # Bluetooth works through a service
+        services = (
+            # Define a service that controls the lights
+            (   # This one in parentheses represents a service
+                bluetooth.UUID(service_uuid),  # ID of the service
+                (
+                    (bluetooth.UUID(sender_uuid), bluetooth.FLAG_NOTIFY),  # Service type: Notification
+                    (bluetooth.UUID(reader_uuid), bluetooth.FLAG_WRITE),   # Service type: Write
+                )
+            ),
+            # Other services can also be defined below
+            #-- Other Services
+        )
+ 
+        ((self.tx, self.rx,), ) = self.ble.gatts_register_services(services)
+ 
+    def send(self, data): 
+        self.ble.gatts_notify(0, self.tx, data + '\n')  #Bluetooth sends notification messages
+ 
+    def advertiser(self):  # When the connection is disconnected, broadcast begins
+        name = bytes(self.name, 'UTF-8')  # Convert the device name to utf-8 format
+        adv_data = bytearray('\x02\x01\x02') + bytearray((len(name) + 1, 0x09)) + name
+        self.ble.gap_advertise(100, adv_data)
+        print(adv_data)
+        print("\r\n")
+ 
+ 
+def buttons_irq(pin):  # Create the BOOT key function
+    led.value(not led.value())
+    print('LED is ON.' if led.value() else 'LED is OFF')
+    ble.send('LED is ON.' if led.value() else 'LED is OFF')
+#小车运动函数：
+#前进：
+def  move_up():
+      A1.value(1)
+      A2.value(0)
+      pwmA.duty(200)
+      B1.value(1)
+      B2.value(0)
+      pwmB.duty(200)
+      C1.value(0)
+      C2.value(1)
+      pwmC.duty(200)
+      D1.value(1)
+      D2.value(0)
+      pwmD.duty(200)
+      
+#后退：
+def move_down():
+      A1.value(0)
+      A2.value(1)
+      pwmA.duty(200)
+      B1.value(0)
+      B2.value(1)
+      pwmB.duty(200)
+      C1.value(1)
+      C2.value(0)
+      pwmC.duty(200)
+      D1.value(0)
+      D2.value(1)
+      pwmD.duty(200)
+#左移：
+def move_left():
+      A1.value(1)
+      A2.value(0)
+      pwmA.duty(300)
+      B1.value(0)
+      B2.value(1)
+      pwmB.duty(300)
+      C1.value(0)
+      C2.value(1)
+      pwmC.duty(300)
+      D1.value(0)
+      D2.value(1)
+      pwmD.duty(300)
+      
+#右移：
+def move_right():
+      A1.value(0)
+      A2.value(1)
+      pwmA.duty(400)
+      B1.value(1)
+      B2.value(0)
+      pwmB.duty(400)
+      C1.value(1)
+      C2.value(0)
+      pwmC.duty(400)
+      D1.value(1)
+      D2.value(0)
+      pwmD.duty(400)
+      
+#停车：
+def move_stop():
+      A1.value(0)
+      A2.value(0)
+      pwmA.duty(0)
+      B1.value(0)
+      B2.value(0)
+      pwmB.duty(0)
+      C1.value(0)
+      C2.value(0)
+      pwmC.duty(0)
+      D1.value(0)
+      D2.value(0)
+      pwmD.duty(0)
+      
+def turn_left():
+    A1.value(1)
+    A2.value(0)
+    pwmA.duty(200)
+    D1.value(1)
+    D2.value(0)
+    pwmD.duty(200)
+    B1.value(0)
+    B2.value(0)
+    pwmB.duty(0)
+    C1.value(0)
+    C2.value(0)
+    pwmC.duty(0)
+ 
+ 
+if __name__ == "__main__":
+    global x
+    global y
+    
+    ble = ESP32_BLE("ESP32 BLE")  # Creates an object with one argument that will be used later to name BLE
+ 
+    but = Pin(0, Pin.IN)  # The GPIO port of the BOOT button on the right of the USB port on the ESP32 development board is 0
+    but.irq(trigger=Pin.IRQ_FALLING, handler=buttons_irq)  # Set interrupt
+ 
+    led = Pin(2, Pin.OUT) # Create a blue LED object
+ 
+    while True:
+        if BLE_MSG == 'x = 4':  
+            x = 4
+            print("Query: " + BLE_MSG)
+            #Print out the read information
+            BLE_MSG = ""
+        elif BLE_MSG == 'x = 5':  
+            x = 5
+            print("Command: " + BLE_MSG) 
+            BLE_MSG = ""
+        elif BLE_MSG == 'x = 3':  
+            print("Command: " + BLE_MSG)  
+            x = 3
+            BLE_MSG = "" 
+        elif BLE_MSG == 'x = 2': 
+            print("Command: " + BLE_MSG)  
+            x = 2
+            BLE_MSG = ""elif BLE_MSG == 'x = 1': 
+            print("Command: " + BLE_MSG)  
+            x = 1
+            BLE_MSG = ""
+        elif BLE_MSG == 'x = 0':  
+            print("Command: " + BLE_MSG)  
+            x = 0
+            BLE_MSG = ""
+        elif BLE_MSG == 'y = 1':  
+            print("Command: " + BLE_MSG) 
+            y = 1
+            BLE_MSG = ""
+        elif BLE_MSG == 'y = 2':  
+            print("Command: " + BLE_MSG) 
+            y = 2
+            BLE_MSG = ""
+        elif BLE_MSG == 'y = 3': 
+            print("Command: " + BLE_MSG)  
+            y = 3
+            BLE_MSG = ""
+        elif BLE_MSG == 'y = 4':  
+            print("Command: " + BLE_MSG)  
+            y = 4
+            BLE_MSG = ""
+        elif BLE_MSG == 'y = 5':  
+            print("Command: " + BLE_MSG)  
+            y = 5
+            BLE_MSG = ""
+        
+        
+ 
+        sleep_ms(100)
